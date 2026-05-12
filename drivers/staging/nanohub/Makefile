@@ -9,3 +9,4 @@ nanohub-$(CONFIG_SENSOR_DRV) += main.o comms.o
 
 
 nanohub-y += chub_shub.o
+CFLAGS_chub_ipc_if.o += -Wno-frame-larger-than=

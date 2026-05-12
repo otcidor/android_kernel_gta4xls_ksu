@@ -185,3 +185,4 @@ endif
 ifeq ($(CONFIG_SCSC_PCIE), m)
 ccflags-y += -DCONFIG_SCSC_PCIE
 endif
+CFLAGS_procfs.o += -Wno-frame-larger-than=
