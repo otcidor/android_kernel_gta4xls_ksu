@@ -154,6 +154,8 @@ obj-$(CONFIG_SCSI_ENCLOSURE)	+= ses.o
 
 obj-$(CONFIG_SCSI_HISI_SAS) += hisi_sas/
 
+TARGET_SOC ?= s5e8825
+
 ifdef CONFIG_UFS_SRPMB
 ccflags-y += -I$(srctree)/drivers/scsi/ufs/$(TARGET_SOC)
 endif

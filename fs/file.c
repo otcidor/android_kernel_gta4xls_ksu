@@ -726,8 +726,18 @@ static inline void __range_cloexec(struct files_struct *cur_fds,
 static inline void __range_close(struct files_struct *cur_fds, unsigned int fd,
 				 unsigned int max_fd)
 {
+	struct fdtable *fdt;
+
+	spin_lock(&cur_fds->file_lock);
+	fdt = files_fdtable(cur_fds);
+	max_fd = min(last_fd(fdt), max_fd);
+	spin_unlock(&cur_fds->file_lock);
+
 	while (fd <= max_fd) {
 		struct file *file;
+
+		if (fatal_signal_pending(current))
+			break;
 
 		file = pick_file(cur_fds, fd++);
 		if (!file)
