@@ -500,6 +500,7 @@ int is_hw_group_open(void *group_data)
 		break;
 	default:
 		merr("(%s) is invalid", group, group_id_name[group_id]);
+		ret = -EINVAL;
 		break;
 	}
 

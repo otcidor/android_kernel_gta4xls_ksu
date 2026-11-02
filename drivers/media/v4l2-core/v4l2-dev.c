@@ -24,6 +24,8 @@
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/pid_namespace.h>
+#include <linux/user_namespace.h>
 
 #include <media/v4l2-common.h>
 #include <media/v4l2-device.h>
@@ -414,6 +416,18 @@ static int v4l2_open(struct inode *inode, struct file *filp)
 	if (vdev == NULL || !video_is_registered(vdev)) {
 		mutex_unlock(&videodev_lock);
 		return -ENODEV;
+	}
+
+	/*
+	 * Samsung Exynos camera ISP nodes (fimc_is) panic if probed/opened
+	 * outside the Android Camera HAL sequence. Disallow access from
+	 * containers (non-init namespaces) to prevent kernel panic when
+	 * user-space browsers (e.g. Firefox WebRTC) probe all /dev/video*.
+	 */
+	if (task_active_pid_ns(current) != &init_pid_ns ||
+	    current_user_ns() != &init_user_ns) {
+		mutex_unlock(&videodev_lock);
+		return -EPERM;
 	}
 	/* and increase the device refcount */
 	video_get(vdev);
