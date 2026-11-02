@@ -346,134 +346,11 @@ static bool dbg_snapshot_get_enable_log_item(const char *name)
 	return false;
 }
 
-static void dbg_snapshot_task(int cpu, struct task_struct *task)
-{
-	unsigned long idx;
-	struct dbg_snapshot_log_item *log_item = &dss_log_items[DSS_LOG_TASK_ID];
-	struct task_log *entry = (struct task_log *)log_item->entry.vaddr;
-
-	idx = (atomic_fetch_inc(&dss_log_misc.task_log_idx[cpu]) % log_item->log_num) +
-								(cpu * log_item->log_num);
-	entry[idx].time = local_clock();
-	entry[idx].task = task;
-	entry[idx].pid = task_pid_nr(task);
-	strncpy(entry[idx].task_comm, task->comm, TASK_COMM_LEN - 1);
-}
-
-static void dbg_snapshot_sched_switch(void *ignore, bool preempt,
-				      struct task_struct *prev,
-				      struct task_struct *next)
-{
-	dbg_snapshot_task(raw_smp_processor_id(), next);
-}
-
-static void dbg_snapshot_work(work_func_t fn, int en)
-{
-	unsigned long idx;
-	struct dbg_snapshot_log_item *log_item = &dss_log_items[DSS_LOG_WORK_ID];
-	struct work_log *entry = (struct work_log *)log_item->entry.vaddr;
-	int cpu = raw_smp_processor_id();
-
-	idx = (atomic_fetch_inc(&dss_log_misc.work_log_idx[cpu]) % log_item->log_num) +
-								(cpu * log_item->log_num);
-	entry[idx].time = local_clock();
-	entry[idx].fn = fn;
-	entry[idx].en = en;
-}
-
-static void dbg_snapshot_wq_start(void *ignore, struct work_struct *work)
-{
-	dbg_snapshot_work(work->func, DSS_FLAG_IN);
-}
-
-static void dbg_snapshot_wq_end(void *ignore, struct work_struct *work,
-				work_func_t func)
-{
-	dbg_snapshot_work(func, DSS_FLAG_OUT);
-}
 
 void dbg_snapshot_cpuidle(char *modes, unsigned int state, s64 diff, int en)
 {
-	unsigned long idx;
-	struct dbg_snapshot_log_item *log_item = &dss_log_items[DSS_LOG_CPUIDLE_ID];
-	struct cpuidle_log *entry = (struct cpuidle_log *)log_item->entry.vaddr;
-	int cpu = raw_smp_processor_id();
-
-	if (!dbg_snapshot_is_log_item_enabled(DSS_LOG_CPUIDLE_ID))
-		return;
-
-	idx = (atomic_fetch_inc(&dss_log_misc.cpuidle_log_idx[cpu]) % log_item->log_num) +
-									(cpu * log_item->log_num);
-	entry[idx].time = cpu_clock(cpu);
-	entry[idx].modes = modes;
-	entry[idx].state = state;
-	entry[idx].num_online_cpus = num_online_cpus();
-	entry[idx].delta = (int)diff;
-	entry[idx].en = en;
 }
 EXPORT_SYMBOL_GPL(dbg_snapshot_cpuidle);
-
-static void dbg_snapshot_irq(int irq, void *fn, int en)
-{
-	unsigned long idx;
-	struct dbg_snapshot_log_item *log_item = &dss_log_items[DSS_LOG_IRQ_ID];
-	struct irq_log *entry = (struct irq_log *)log_item->entry.vaddr;
-	unsigned long flags = arch_local_irq_save();
-	int cpu = raw_smp_processor_id();
-
-	idx = (atomic_fetch_inc(&dss_log_misc.irq_log_idx[cpu]) % log_item->log_num) +
-								(cpu * log_item->log_num);
-	entry[idx].time = local_clock();
-	entry[idx].irq = irq;
-	entry[idx].fn = fn;
-	entry[idx].desc = irq_to_desc(irq);
-	entry[idx].en = en;
-#if IS_ENABLED(CONFIG_SEC_DEBUG)
-	entry[idx].latency = READ_ONCE(current_thread_info()->preempt_count);
-#endif
-
-	arch_local_irq_restore(flags);
-}
-
-static void dbg_snapshot_irq_entry(void *ignore, int irq,
-				   struct irqaction *action)
-{
-	dbg_snapshot_irq(irq, action->handler, DSS_FLAG_IN);
-}
-
-static void dbg_snapshot_irq_exit(void *ignore, int irq,
-				   struct irqaction *action, int ret)
-{
-	dbg_snapshot_irq(irq, action->handler, DSS_FLAG_OUT);
-}
-
-static void dbg_snapshot_hrtimer(struct hrtimer *timer, s64 now,
-				 void *fn, int en)
-{
-	unsigned long idx;
-	struct dbg_snapshot_log_item *log_item = &dss_log_items[DSS_LOG_HRTIMER_ID];
-	struct hrtimer_log *entry = (struct hrtimer_log *)log_item->entry.vaddr;
-	int cpu = raw_smp_processor_id();
-
-	idx = (atomic_fetch_inc(&dss_log_misc.hrtimer_log_idx[cpu]) % log_item->log_num) +
-									(cpu * log_item->log_num);
-	entry[idx].time = local_clock();
-	entry[idx].now = now;
-	entry[idx].timer = timer;
-	entry[idx].fn = fn;
-	entry[idx].en = en;
-}
-
-static void dbg_snapshot_hrtimer_entry(void *ignore, struct hrtimer *timer,
-				       ktime_t *now)
-{
-	dbg_snapshot_hrtimer(timer, *now, timer->function, DSS_FLAG_IN);
-}
-
-static void dbg_snapshot_hrtimer_exit(void *ignore, struct hrtimer *timer)
-{
-	dbg_snapshot_hrtimer(timer, 0, timer->function, DSS_FLAG_OUT);
-}
 
 __maybe_unused static void dbg_snapshot_reg(unsigned char io_type,
 					unsigned int data_type,
@@ -1011,21 +888,8 @@ void dbg_snapshot_init_log(void)
 	}
 	dbg_snapshot_set_log_item_field();
 
-	if (dbg_snapshot_get_enable_log_item(DSS_LOG_TASK))
-		register_trace_sched_switch(dbg_snapshot_sched_switch, NULL);
 
-	if (dbg_snapshot_get_enable_log_item(DSS_LOG_WORK)) {
-		register_trace_workqueue_execute_start(dbg_snapshot_wq_start, NULL);
-		register_trace_workqueue_execute_end(dbg_snapshot_wq_end, NULL);
-	}
-	if (dbg_snapshot_get_enable_log_item(DSS_LOG_IRQ)) {
-		register_trace_irq_handler_entry(dbg_snapshot_irq_entry, NULL);
-		register_trace_irq_handler_exit(dbg_snapshot_irq_exit, NULL);
-	}
-	if (dbg_snapshot_get_enable_log_item(DSS_LOG_HRTIMER)) {
-		register_trace_hrtimer_expire_entry(dbg_snapshot_hrtimer_entry, NULL);
-		register_trace_hrtimer_expire_exit(dbg_snapshot_hrtimer_exit, NULL);
-	}
+
 	if (dbg_snapshot_get_enable_log_item(DSS_LOG_SUSPEND)) {
 		register_trace_suspend_resume(dbg_snapshot_suspend_resume, NULL);
 		register_trace_device_pm_callback_start(dbg_snapshot_dev_pm_cb_start, NULL);
