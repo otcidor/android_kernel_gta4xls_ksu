@@ -1772,11 +1772,8 @@ int is_group_open(struct is_groupmgr *groupmgr,
 
 	FIMC_BUG(!groupmgr);
 	FIMC_BUG(!group);
-	FIMC_BUG(!group->device);
 	FIMC_BUG(!vctx);
 	FIMC_BUG(id >= GROUP_ID_MAX);
-	FIMC_BUG(group->instance >= IS_STREAM_COUNT);
-	FIMC_BUG(group->slot >= GROUP_SLOT_MAX);
 
 	if (test_bit(IS_GROUP_OPEN, &group->state)) {
 		if (group->id == id) {
