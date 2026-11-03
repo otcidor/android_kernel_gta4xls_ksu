@@ -52,6 +52,9 @@ int gpu_dvfs_get_cur_clock(void)
 {
 	int clock = 0;
 
+	if (!dvfs)
+		return 0;
+
 	gpex_pm_lock();
 	if (gpex_pm_get_status(false))
 		clock = gpex_clock_get_clock_slow();
@@ -65,6 +68,9 @@ int gpu_dvfs_get_utilization(void)
 {
 	int util = 0;
 
+	if (!dvfs)
+		return 0;
+
 	if (gpex_pm_get_status(true) == 1)
 		util = dvfs->env_data.utilization;
 
@@ -74,12 +80,16 @@ EXPORT_SYMBOL_GPL(gpu_dvfs_get_utilization);
 
 int gpu_dvfs_get_min_freq(void)
 {
+	if (!dvfs)
+		return 0;
 	return gpex_clock_get_min_clock();
 }
 EXPORT_SYMBOL_GPL(gpu_dvfs_get_min_freq);
 
 int gpu_dvfs_get_max_freq(void)
 {
+	if (!dvfs)
+		return 0;
 	return gpex_clock_get_max_clock();
 }
 EXPORT_SYMBOL_GPL(gpu_dvfs_get_max_freq);
@@ -88,6 +98,9 @@ int gpu_dvfs_get_max_locked_freq(void)
 {
 	unsigned long flags;
 	int locked_clock = -1;
+
+	if (!dvfs)
+		return 0;
 
 	gpex_dvfs_spin_lock(&flags);
 	locked_clock = gpex_clock_get_max_lock();
@@ -103,6 +116,9 @@ int gpu_dvfs_get_min_locked_freq(void)
 {
 	unsigned long flags;
 	int locked_clock = -1;
+
+	if (!dvfs)
+		return 0;
 
 	gpex_dvfs_spin_lock(&flags);
 	locked_clock = gpex_clock_get_min_lock();
