@@ -1,4 +1,6 @@
 #!/bin/bash
+export PATH=/home/iprodicto/toolchains/clang-r416183b/bin:/home/iprodicto/toolchains/arm-gnu/bin:$PATH
+
 make \
   ARCH=arm64 \
   CC=clang \
