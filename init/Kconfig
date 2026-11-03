@@ -459,8 +459,7 @@ config HAVE_ARCH_AUDITSYSCALL
 	bool
 
 config AUDITSYSCALL
-	bool "Enable system call auditing support"
-	default y
+	def_bool y
 	depends on AUDIT && HAVE_ARCH_AUDITSYSCALL
 	select FSNOTIFY
 
